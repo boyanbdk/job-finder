@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Curated platforms from the research (the "apply to these" tracker).
+model Platform {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  category    String
+  tier        String // start_now | apply_now | build
+  url         String
+  pay         String
+  payout      String
+  eligibility String   @default("eligible") // eligible | verify
+  entry       String
+  mode        String // async | voice | mixed
+  fit         String
+  recommended Boolean  @default(false)
+  status      String   @default("todo") // todo | applied | in_progress | accepted | earning | rejected
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Live job listings aggregated from public job-board APIs.
+model Job {
+  id          Int       @id @default(autoincrement())
+  source      String
+  externalId  String
+  title       String
+  company     String    @default("")
+  url         String
+  location    String    @default("")
+  tags        String    @default("")
+  salary      String    @default("")
+  description String    @default("")
+  postedAt    DateTime?
+  score       Int       @default(0)
+  matched     String    @default("")
+  status      String    @default("new") // new | saved | applied | hidden (your triage)
+  isNew       Boolean   @default(false) // first seen in the most recent refresh (🆕 badge)
+  eligible    Boolean   @default(true)  // region-eligible for a BG/EU candidate
+  senior      Boolean   @default(false) // flagged senior / over-capacity
+  fetchedAt   DateTime  @default(now())
+
+  @@unique([source, externalId])
+}
