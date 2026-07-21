@@ -6,7 +6,7 @@ import { PrismaClient } from "@prisma/client";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { fetchAllJobs } from "../src/lib/sources";
-import { scoreJob, classifyEligible, classifySenior } from "../src/lib/profile";
+import { scoreJob, classifyEligible, classifySenior, classifyWorkMode } from "../src/lib/profile";
 import { readFileSync } from "node:fs";
 
 // Load .env so sources.ts can read ADZUNA_APP_ID/KEY in standalone runs
@@ -54,7 +54,7 @@ async function main() {
     });
     await prisma.job.update({
       where: { id: r.id },
-      data: { score, matched: matched.join(", "), eligible: classifyEligible(r.title, r.location), senior: classifySenior(r.title, r.description) },
+      data: { score, matched: matched.join(", "), eligible: classifyEligible(r.title, r.location), senior: classifySenior(r.title, r.description), workMode: classifyWorkMode(r.title, r.location, r.description) },
     });
   }
 

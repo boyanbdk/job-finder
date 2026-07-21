@@ -114,11 +114,15 @@ const NEGATIVE: KW[] = [
   ...mk(-6, "10+ years", "9+ years", "8+ years", "7+ years", "6+ years", "5+ years",
     "security clearance", "us citizen", "u.s. citizen", "usa only", "us only",
     "united states only", "must reside in the us", "must be based in the us"),
-  // fully-remote ONLY — no hybrid/on-site (he can't relocate/commute to a city)
-  ...mk(-8, "on-site", "onsite", "on site", "in office", "in-office", "hybrid", "hybride", "teilremote", "partly remote"),
   // no-calls is a hard preference → sink phone/voice roles
   ...mk(-8, ...CALLS),
 ];
+
+// Hybrid/on-site terms sink a role ONLY when it isn't domestic (Sofia is
+// commutable; Berlin is not). Applied conditionally in scoreJob.
+const ONSITE_HYBRID: KW[] = mk(-8,
+  "on-site", "onsite", "on site", "in office", "in-office", "hybrid", "hybride", "teilremote", "partly remote",
+);
 
 // Off-target families + pure-dev roles (he doesn't code). A TITLE hit (-10)
 // reliably drops the role below the floor; a description-only mention (-3) is mild
@@ -171,6 +175,7 @@ export function scoreJob(j: ScoreInput): { score: number; matched: string[] } {
     .join(" ")
     .toLowerCase()} `;
   const all = title + body;
+  const domestic = classifyWorkMode(j.title, j.location || "", j.description || "") === "domestic";
 
   let score = 0;
   const matched = new Set<string>();
@@ -186,6 +191,14 @@ export function scoreJob(j: ScoreInput): { score: number; matched: string[] } {
   }
   for (const { kw, w } of NEGATIVE) {
     if (title.includes(kw) || body.includes(kw)) score += w;
+  }
+  // Hybrid/on-site only sinks non-domestic roles; a BG-based hybrid is fine.
+  if (!domestic) {
+    for (const { kw, w } of ONSITE_HYBRID) {
+      if (title.includes(kw) || body.includes(kw)) score += w;
+    }
+  } else {
+    matched.add("🏠 domestic");
   }
   // Off-target / dev-role penalty — title hit is decisive (and disqualifies anchor).
   let offTargetTitle = false;
@@ -261,6 +274,35 @@ const TITLE_REGION_BLOCK = [
   "us only", "usa only", "us-based", "u.s. only", "us-only", "north america only",
   "us residents", "must be based in the us", "united states", "- united states", "- usa",
 ];
+
+// --------------------------------------------------------------------------
+// Work mode: "domestic" = the job is based in Bulgaria (Sofia commutable →
+// hybrid/on-site is acceptable); everything else is "remote" (must be fully
+// remote to be workable). Bulgarian-language and BG-city signals both count.
+// --------------------------------------------------------------------------
+
+const DOMESTIC_SIGNALS = [
+  "bulgaria", "българия", "sofia", "софия", "plovdiv", "пловдив", "varna", "варна",
+  "burgas", "бургас", "ruse", "русе", "stara zagora", "стара загора",
+  "veliko tarnovo", "велико търново", "pleven", "плевен",
+];
+
+export type WorkMode = "domestic" | "remote";
+
+// Word-boundary test so "Bulgarian Linguist (remote)" ≠ based-in-Bulgaria:
+// the language adjective ("bulgarian") must not trip the country signal.
+const hasSignal = (text: string) =>
+  DOMESTIC_SIGNALS.some((s) => new RegExp(`(^|[^a-zа-я])${s}($|[^a-zа-я])`, "i").test(text));
+
+export function classifyWorkMode(title: string, location: string, description = ""): WorkMode {
+  if (hasSignal(location || "") || hasSignal(title || "")) return "domestic";
+  // Location fields are often empty (e.g. HN posts) — fall back to a body scan,
+  // but only when the description ALSO talks about an office/hybrid setup, so
+  // "open to candidates in Bulgaria, Romania…" (a remote job) doesn't trip it.
+  const d = (description || "").toLowerCase();
+  if (hasSignal(d) && /(office|hybrid|on-?site|офис|хибрид)/.test(d)) return "domestic";
+  return "remote";
+}
 
 export function classifyEligible(title: string, location: string): boolean {
   const t = ` ${(title || "").toLowerCase()} `;

@@ -384,6 +384,51 @@ async function adzuna(): Promise<RawJob[]> {
   });
 }
 
+async function devbg(): Promise<RawJob[]> {
+  // dev.bg — Bulgaria's main tech job board (WordPress job archive → RSS).
+  // Feeds the DOMESTIC category: BG-based roles where hybrid/on-site is fine.
+  // Category slugs chosen for Boyan's lanes (support-ish + QA + junior-friendly).
+  const feeds = [
+    "https://dev.bg/company/jobs/feed/",
+    "https://dev.bg/company/jobs/customer-support/feed/",
+    "https://dev.bg/company/jobs/it-support/feed/",
+    "https://dev.bg/company/jobs/quality-assurance/feed/",
+  ];
+  const parser = new XMLParser();
+  const out: RawJob[] = [];
+  const seen = new Set<string>();
+  for (const feed of feeds) {
+    try {
+      const doc = parser.parse(await getText(feed));
+      for (const it of arr(doc?.rss?.channel?.item)) {
+        const link = String(it.link || "");
+        if (!link || seen.has(link)) continue;
+        seen.add(link);
+        const cats = arr(it.category).concat(typeof it.category === "string" ? [it.category] : []).map(String);
+        out.push({
+          source: "dev.bg",
+          externalId: String(it.guid?.["#text"] || it.guid || link),
+          title: String(it.title || ""),
+          company: String(it["dc:creator"] || it.creator || "").trim(),
+          url: link,
+          // dev.bg listings are BG-based by definition; category often carries
+          // the city / "Remote" chip, so keep it visible in the location field.
+          location: [cats.find((c) => /remote|sofia|plovdiv|varna|burgas/i.test(c)), "Bulgaria"]
+            .filter(Boolean)
+            .join(" · "),
+          tags: cats,
+          salary: "",
+          description: stripHtml(it["content:encoded"] || it.description),
+          postedAt: it.pubDate ? new Date(it.pubDate) : null,
+        });
+      }
+    } catch {
+      /* skip this feed */
+    }
+  }
+  return out.filter((j) => j.title && j.url);
+}
+
 export type FetchResult = {
   jobs: RawJob[];
   bySource: Record<string, number>;
@@ -401,6 +446,7 @@ export async function fetchAllJobs(): Promise<FetchResult> {
     ["Himalayas", himalayas],
     ["WorkingNomads", workingnomads],
     ["Jobspresso", jobspresso],
+    ["dev.bg", devbg],
     ["Adzuna", adzuna],
   ];
   const results = await Promise.allSettled(sources.map(([, fn]) => fn()));

@@ -13,6 +13,7 @@ export async function GET(req: Request) {
   const sort = sp.get("sort") || "score";
   const onlyNew = sp.get("new") === "1";
   const showAll = sp.get("all") === "1"; // bypass the relevance gate
+  const mode = sp.get("mode") || ""; // "" | domestic | remote
 
   const where: Record<string, unknown> = {};
   if (onlyNew) {
@@ -21,6 +22,7 @@ export async function GET(req: Request) {
   } else if (status === "active") where.status = { not: "hidden" };
   else if (status !== "all") where.status = status;
   if (source) where.source = source;
+  if (mode === "domestic" || mode === "remote") where.workMode = mode;
 
   // The "can actually apply" gate applies to the browseable views (All / New)
   // unless the user asks to Show all. Saved/Applied/Hidden are never gated.
@@ -50,12 +52,14 @@ export async function GET(req: Request) {
 
   const notHidden = { status: { not: "hidden" } };
   const relevantWhere = { ...notHidden, eligible: true, senior: false, score: { gte: FLOOR } };
-  const [relevant, totalActive, saved, applied, fresh, agg] = await Promise.all([
+  const [relevant, totalActive, saved, applied, fresh, domestic, remote, agg] = await Promise.all([
     prisma.job.count({ where: relevantWhere }),
     prisma.job.count({ where: notHidden }),
     prisma.job.count({ where: { status: "saved" } }),
     prisma.job.count({ where: { status: "applied" } }),
     prisma.job.count({ where: { ...relevantWhere, isNew: true } }),
+    prisma.job.count({ where: { ...relevantWhere, workMode: "domestic" } }),
+    prisma.job.count({ where: { ...relevantWhere, workMode: "remote" } }),
     prisma.job.aggregate({ _max: { fetchedAt: true } }),
   ]);
 
@@ -66,6 +70,8 @@ export async function GET(req: Request) {
       saved,
       applied,
       fresh,
+      domestic,
+      remote,
       filtered: Math.max(0, totalActive - relevant),
       totalActive,
     },

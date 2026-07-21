@@ -5,7 +5,7 @@ A personal job-hunting app for **Boyan Budakov** (Sofia, BG · BG/EN/DE · Next.
 Two parts:
 
 1. **Platform Tracker** — the ~48 researched remote/freelance platforms you can sign up for (AI data-training, crowdtesting/QA, localization, freelance dev, paid research/UX, tutoring/writing). Each shows pay, payout method, Bulgaria eligibility, entry difficulty and a fit note — and you can track each application's **status + notes**.
-2. **Live Jobs** — actively pulls fresh listings from public job boards and **scores them against your profile** (Next.js, React, TypeScript, Python, QA, localization, **German/EU**, junior/freelance/contract). Save / mark applied / hide.
+2. **Live Jobs** — actively pulls fresh listings from public job boards and **scores them against your profile** (Next.js, React, TypeScript, Python, QA, localization, **German/EU**, junior/freelance/contract). Save / mark applied / hide. Results are split into **two categories**: **🏠 Domestic** (Bulgaria-based — hybrid/on-site is fine since Sofia is commutable) and **🌍 Remote-only** (everything else, which must be fully remote). Hybrid/on-site roles are only penalised in the remote category.
 
 Built with **Next.js 16 (App Router) + TypeScript + Tailwind v4 + Prisma + SQLite**. Runs fully local — all data lives in a SQLite file. One **optional** API key (Adzuna) unlocks an extra job source; everything else works with zero config.
 
@@ -36,6 +36,7 @@ Open **http://localhost:3000**. Click **“↻ Search for new jobs”** on the L
 |--------|----------|
 | RemoteOK, Remotive, Jobicy, WeWorkRemotely | remote dev / tech / QA / support |
 | **Arbeitnow** | German & EU roles (your edge) |
+| **dev.bg** | Bulgarian tech roles (the 🏠 Domestic category) |
 | HN “Who's Hiring” | contract / startup gigs |
 
 Each source is fetched server-side (no CORS issues) and failures are isolated — one dead source won't break a refresh.

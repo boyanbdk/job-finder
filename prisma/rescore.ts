@@ -4,7 +4,7 @@
 import { PrismaClient } from "@prisma/client";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { scoreJob, classifyEligible, classifySenior, RELEVANCE_FLOOR } from "../src/lib/profile";
+import { scoreJob, classifyEligible, classifySenior, classifyWorkMode, RELEVANCE_FLOOR } from "../src/lib/profile";
 
 const dbPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "dev.db");
 const prisma = new PrismaClient({ datasources: { db: { url: `file:${dbPath}` } } });
@@ -26,6 +26,7 @@ async function main() {
         matched: matched.join(", "),
         eligible: classifyEligible(r.title, r.location),
         senior: classifySenior(r.title, r.description),
+        workMode: classifyWorkMode(r.title, r.location, r.description),
       },
     });
   }

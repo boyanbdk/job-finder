@@ -17,10 +17,11 @@ type Job = {
   isNew: boolean;
   eligible: boolean;
   senior: boolean;
+  workMode: string;
   postedAt: string | null;
 };
 
-const SOURCES = ["RemoteOK", "Remotive", "Arbeitnow", "Jobicy", "WeWorkRemotely", "HN Who's Hiring", "Himalayas", "WorkingNomads", "Adzuna"];
+const SOURCES = ["RemoteOK", "Remotive", "Arbeitnow", "Jobicy", "WeWorkRemotely", "HN Who's Hiring", "Himalayas", "WorkingNomads", "Jobspresso", "dev.bg", "Adzuna"];
 const REFRESH_MS = 30 * 60 * 1000; // 30 minutes
 
 function scoreColor(s: number) {
@@ -50,7 +51,7 @@ function since(iso: string | null) {
 
 export default function LiveJobs() {
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [counts, setCounts] = useState({ all: 0, saved: 0, applied: 0, fresh: 0, filtered: 0, totalActive: 0 });
+  const [counts, setCounts] = useState({ all: 0, saved: 0, applied: 0, fresh: 0, filtered: 0, totalActive: 0, domestic: 0, remote: 0 });
   const [floor, setFloor] = useState(6);
   const [lastRefreshAt, setLastRefreshAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,7 @@ export default function LiveJobs() {
   const [min, setMin] = useState(0);
   const [sort, setSort] = useState("score");
   const [tab, setTab] = useState("active");
+  const [mode, setMode] = useState(""); // "" = both categories | domestic | remote
   const [autoOn, setAutoOn] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
@@ -74,14 +76,15 @@ export default function LiveJobs() {
     if (showAll) params.set("all", "1");
     if (q.trim()) params.set("q", q.trim());
     if (source) params.set("source", source);
+    if (mode) params.set("mode", mode);
     const res = await fetch(`/api/jobs?${params.toString()}`);
     const data = await res.json();
     setJobs(data.jobs || []);
-    setCounts(data.counts || { all: 0, saved: 0, applied: 0, fresh: 0, filtered: 0, totalActive: 0 });
+    setCounts(data.counts || { all: 0, saved: 0, applied: 0, fresh: 0, filtered: 0, totalActive: 0, domestic: 0, remote: 0 });
     setFloor(data.floor ?? 6);
     setLastRefreshAt(data.lastRefreshAt ?? null);
     setLoading(false);
-  }, [tab, sort, min, q, source, showAll]);
+  }, [tab, sort, min, q, source, showAll, mode]);
 
   const loadRef = useRef(load);
   useEffect(() => {
@@ -178,8 +181,9 @@ export default function LiveJobs() {
         <div>
           <h1 className="text-xl font-bold text-slate-900">Live Jobs</h1>
           <p className="text-sm text-slate-500">
-            Roles you can actually apply to — <span className="font-medium text-slate-700">EU/worldwide</span>,{" "}
-            <span className="font-medium text-slate-700">no-calls</span>, matched to your lanes (writing · translation · support · AI).{" "}
+            Roles you can actually apply to, in two categories: <span className="font-medium text-slate-700">🏠 Domestic</span> (Bulgaria —
+            hybrid/on-site OK) and <span className="font-medium text-slate-700">🌍 Remote-only</span>.{" "}
+            <span className="font-medium text-slate-700">No-calls</span>, matched to your lanes (support · translation · automation · AI).{" "}
             <span className="font-medium text-slate-700">⚓ = anchor</span> (contract + remote). Updated{" "}
             <span className="font-medium text-slate-700">{since(lastRefreshAt)}</span>.
           </p>
@@ -212,6 +216,22 @@ export default function LiveJobs() {
             }`}
           >
             {t.label}
+          </button>
+        ))}
+        <span className="mx-1 h-5 w-px bg-slate-200" />
+        {[
+          { key: "", label: "Both categories" },
+          { key: "domestic", label: `🏠 Domestic BG${counts.domestic ? ` (${counts.domestic})` : ""}` },
+          { key: "remote", label: `🌍 Remote-only${counts.remote ? ` (${counts.remote})` : ""}` },
+        ].map((m) => (
+          <button
+            key={m.key}
+            onClick={() => setMode(m.key)}
+            className={`rounded-full px-3 py-1 text-sm ${
+              mode === m.key ? "bg-indigo-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            {m.label}
           </button>
         ))}
         <span className="mx-1 h-5 w-px bg-slate-200" />
@@ -262,8 +282,24 @@ export default function LiveJobs() {
           <p className="mb-2 text-xs text-slate-400">
             {jobs.length} shown{gatedView && !showAll && counts.filtered ? ` · ${counts.filtered} hidden as not-applicable` : ""}
           </p>
-          <ul className="space-y-3">
-            {jobs.map((j) => {
+          {(mode === ""
+            ? ([
+                ["domestic", "🏠 Domestic — Bulgaria (hybrid / on-site OK)"],
+                ["remote", "🌍 Remote-only"],
+              ] as const)
+            : ([[mode, ""]] as const)
+          ).map(([m, heading]) => {
+            const group = mode === "" ? jobs.filter((j) => (j.workMode || "remote") === m) : jobs;
+            if (mode === "" && group.length === 0) return null;
+            return (
+              <section key={m} className="mb-6">
+                {heading && (
+                  <h2 className="mb-2 mt-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                    {heading} <span className="font-normal text-slate-400">({group.length})</span>
+                  </h2>
+                )}
+                <ul className="space-y-3">
+                  {group.map((j) => {
               const flags = flagsFor(j);
               return (
                 <li
@@ -338,7 +374,10 @@ export default function LiveJobs() {
                 </li>
               );
             })}
-          </ul>
+                </ul>
+              </section>
+            );
+          })}
         </>
       )}
     </div>

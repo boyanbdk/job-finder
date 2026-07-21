@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchAllJobs } from "@/lib/sources";
-import { scoreJob, classifyEligible, classifySenior } from "@/lib/profile";
+import { scoreJob, classifyEligible, classifySenior, classifyWorkMode } from "@/lib/profile";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -61,6 +61,7 @@ export async function POST() {
         matched: matched.join(", "),
         eligible: classifyEligible(r.title, r.location),
         senior: classifySenior(r.title, r.description),
+        workMode: classifyWorkMode(r.title, r.location, r.description),
       },
     });
   }
