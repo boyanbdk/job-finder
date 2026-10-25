@@ -7,7 +7,7 @@
 //                            — NO voice/video calls (German TEXT is fine).
 //   PRIMARY (w6)  🅱 BUILD  = no-code AI automation (n8n/Make/Zapier + GPT/Claude),
 //                            sold as build-fee + monthly retainer.
-//   EDGE    (w6)  localization / translation — native-Bulgarian moat.
+//   (EDGE   (w6)  localization / translation — REMOVED 2026-08-03, see below.)
 //   BRIDGE  (w4)  AI rating / training / annotation — flexible cash only, "never the
 //                 runway" → real but secondary, must not outrank the primary lanes.
 //   DEMOTED (w1)  generic manual QA / game testing — "ruled out as a PRIMARY" in the
@@ -17,6 +17,20 @@
 //   • surfaces "⚓ anchor" roles = contract/part-time + remote/worldwide + NO calls,
 //   • penalises phone/voice/call work, pure-dev titles, and copywriting/content roles,
 //   • keeps Bulgarian premium; German is a full asset for TEXT support (phone sinks).
+//
+// UPDATED 2026-07-22 — circle widened: (a) Bulgaria-DOMESTIC hybrid/home-office
+// jobs are now accepted (chip "🏠 domestic") instead of sunk; only non-BG
+// hybrid/on-site keeps the -8; (b) junior-marked dev titles (junior/graduate/
+// trainee/working-student) are in scope — he's a final-year CS student — and take
+// only -3 instead of the -12 dev-title sink.
+//
+// UPDATED 2026-08-03 — LANGUAGE WORK CUT at his request ("remove the localization
+// and Bulgarian specialist type of thing. I don't want it in my preferred jobs").
+// The old w6 localization/translation edge lane is gone; those keywords now sink a
+// role via LANGUAGE_WORK_NEGATIVE (-12 on a title hit, -2 on a body mention), and
+// the language signals were pulled out of LANE_SIGNALS. "bulgarian" survives as a
+// mild w2 eligibility signal only. Language-specific rater titles left the bridge
+// list too. Rescore the DB after this change: `npx tsx prisma/rescore.ts`.
 //
 // Keyword lists are user-tunable. Re-score the DB after editing with either a
 // refresh in the app, or offline: `npx tsx prisma/rescore.ts`.
@@ -48,19 +62,19 @@ const POSITIVE: KW[] = [
     "ai automation", "automation consultant", "integration specialist", "ai integration",
     "zapier", "make.com", "n8n", "airtable",
   ),
-  // === NATIVE EDGE (w6): localization / translation — Bulgarian moat =========
-  ...mk(6,
-    "translation", "translator", "localization", "localisation", "mtpe",
-    "post-editing", "post-editor", "linguist", "linguistic", "subtitle",
-    "subtitling", "transcription", "transcriber", "proofread", "proofreading", "übersetz",
-    "lqa", "localization qa", // localization-leaning QA stays with the edge
-    "bulgarian",
-  ),
+  // === REMOVED 2026-08-03: the "localization / translation native edge" lane ==
+  // He cut all language work from his pipeline ("remove the localization and
+  // Bulgarian specialist type of thing — I don't want it in my preferred jobs").
+  // Those keywords now live in LANGUAGE_WORK_NEGATIVE below and SINK a role.
+  // "bulgarian" stays a mild positive: it's an eligibility/region signal
+  // ("Remote — Bulgaria", "Bulgarian-speaking support"), not a language-work signal.
+  ...mk(2, "bulgarian"),
   // === BRIDGE (w4): AI rating / training / annotation — gap-filler, NEVER the =
   // runway. Real but secondary, so it must not outrank a primary lane on a body hit.
+  // ("quality rater" / "ads quality rater" / "search quality rater" were dropped
+  //  from here on 2026-08-03 — in practice those postings are language-specific.)
   ...mk(4,
     "prompt engineer", "ai trainer", "ai evaluator", "ai tutor", "rlhf",
-    "quality rater", "ads quality rater", "search quality rater",
     "data annotator", "data annotation", "annotation",
   ),
   // === DEMOTED (w1): generic manual QA / game testing — "ruled out as a =======
@@ -114,23 +128,51 @@ const NEGATIVE: KW[] = [
   ...mk(-6, "10+ years", "9+ years", "8+ years", "7+ years", "6+ years", "5+ years",
     "security clearance", "us citizen", "u.s. citizen", "usa only", "us only",
     "united states only", "must reside in the us", "must be based in the us"),
-  // fully-remote ONLY — no hybrid/on-site (he can't relocate/commute to a city)
-  ...mk(-8, "on-site", "onsite", "on site", "in office", "in-office", "hybrid", "hybride", "teilremote", "partly remote"),
   // no-calls is a hard preference → sink phone/voice roles
   ...mk(-8, ...CALLS),
 ];
 
+// Hybrid/on-site signals. Since 2026-07-22 these only sink a job when it is NOT
+// in Bulgaria — Sofia hybrid/home-office is an accepted DOMESTIC track (he's a
+// final-year student in Sofia until the nomad move). Fully-on-site wording still
+// reads as hybrid-ish here; the human vetting pass catches strict 5-days-office.
+const HYBRID_ONSITE = [
+  "on-site", "onsite", "on site", "in office", "in-office", "hybrid", "hybride",
+  "teilremote", "partly remote",
+];
+const DOMESTIC = ["sofia", "bulgaria", "bulgarien", "софия", "българия"];
+
 // Off-target families + pure-dev roles (he doesn't code). A TITLE hit (-10)
 // reliably drops the role below the floor; a description-only mention (-3) is mild
 // (so "Technical Writer for developer docs" survives, but "Software Developer" sinks).
-const EXTRA_NEGATIVE = [
-  // dev roles he can't do (role-specific, not bare "developer")
+// Dev/engineering titles: since 2026-07-22 these are NO LONGER a blanket reject.
+// A junior-marked title (junior/graduate/trainee/working-student/intern — see
+// JUNIOR_OVERRIDE) targeting low experience + a CS degree (he's final-year CS at
+// Sofia University) is IN scope, so it takes only a mild -3; unmarked (implied
+// mid-level+) dev titles still sink hard.
+const DEV_NEGATIVE = [
   "software engineer", "software developer", "web developer", "back-end engineer",
   "backend engineer", "front-end developer", "frontend developer", "full stack developer",
   "full-stack developer", "devops", "data engineer", "data scientist",
   "machine learning engineer", "ml engineer", "android developer", "ios developer",
   "mobile developer", "site reliability", " sre ", "embedded engineer", "qa engineer",
   "test automation", "solutions architect", "platform engineer",
+];
+
+// Language work — RULED OUT 2026-08-03 at his request. Localization, translation,
+// transcription/subtitling, proofreading, linguistic QA/LQA and "language /
+// trilingual specialist" AI-trainer projects are no longer wanted at all. Treated
+// like the other off-target families: a title hit sinks the role.
+const LANGUAGE_WORK_NEGATIVE = [
+  "translation", "translator", "translat", "localization", "localisation", "localiz",
+  "localis", "mtpe", "post-editing", "post-editor", "linguist", "subtitle", "subtitling",
+  "subtitl", "transcription", "transcriber", "transcri", "proofread", "übersetz",
+  "lqa", "language specialist", "language reviewer", "language expert",
+  "trilingual", "bilingual specialist", "quality rater", "ads quality rater",
+  "search quality rater",
+];
+
+const EXTRA_NEGATIVE = [
   // sales / marketing-ops / consulting / hr / finance-ops / medical / manual
   "sales representative", "inside sales", "outbound sales", "sales development",
   "account executive", "account manager", "account director", "business development",
@@ -152,11 +194,11 @@ const EXTRA_NEGATIVE = [
 // A role only counts as an anchor if it's ALSO in one of Boyan's lanes — so a
 // "Freelance Recruiter (remote)" doesn't qualify just for being contract+remote.
 const LANE_SIGNALS = [
-  "translat", "localis", "localiz", "linguist", "subtitl", "transcri", "proofread", "lqa",
+  // (language-work signals removed 2026-08-03 — that lane no longer exists)
   "customer support", "customer service", "support specialist", "support agent",
   "email support", "chat support", "help desk", "helpdesk", "moderat",
   "technical support", "application support", "service desk", "ticket", "zendesk", "freshdesk", "intercom",
-  "prompt", "ai trainer", "ai evaluat", "ai tutor", "rlhf", "annotation", "quality rater",
+  "prompt", "ai trainer", "ai evaluat", "ai tutor", "rlhf", "annotation",
   "no-code", "no code", "automation specialist", "workflow automation", "ai automation",
   "automation consultant", "integration specialist", "zapier", "make.com", "n8n", "airtable",
   "virtual assistant", "data entry", "research assistant",
@@ -187,13 +229,45 @@ export function scoreJob(j: ScoreInput): { score: number; matched: string[] } {
   for (const { kw, w } of NEGATIVE) {
     if (title.includes(kw) || body.includes(kw)) score += w;
   }
-  // Off-target / dev-role penalty — title hit is decisive (and disqualifies anchor).
+  // Off-target penalty — title hit is decisive (and disqualifies anchor).
   let offTargetTitle = false;
+  // Language work (2026-08-03): sink hard on a title hit — he doesn't want these
+  // in the pipeline at all. A body-only mention is mild (a support role that
+  // happens to say "our docs are localized" shouldn't die for it).
+  for (const kw of LANGUAGE_WORK_NEGATIVE) {
+    if (title.includes(kw)) {
+      score -= 12;
+      offTargetTitle = true;
+    } else if (body.includes(kw)) score -= 2;
+  }
   for (const kw of EXTRA_NEGATIVE) {
     if (title.includes(kw)) {
       score -= 12;
       offTargetTitle = true;
     } else if (body.includes(kw)) score -= 3;
+  }
+  // Dev titles: junior-marked ones are in scope (mild -3 so lane roles still
+  // outrank them slightly); unmarked dev titles sink like before.
+  const juniorTitle = JUNIOR_OVERRIDE.some((s) => title.includes(s));
+  for (const kw of DEV_NEGATIVE) {
+    if (title.includes(kw)) {
+      if (juniorTitle) {
+        score -= 3;
+        matched.add("junior-dev");
+      } else {
+        score -= 12;
+        offTargetTitle = true;
+      }
+    } else if (body.includes(kw)) score -= 3;
+  }
+
+  // Hybrid/on-site: sink unless it's a Bulgaria-domestic job (then chip it).
+  if (HYBRID_ONSITE.some((k) => all.includes(k))) {
+    if (DOMESTIC.some((k) => all.includes(k))) {
+      matched.add("🏠 domestic");
+    } else {
+      score -= 8;
+    }
   }
 
   // Anchor bonus + visible chip (contract/part-time + remote/worldwide, no calls).
